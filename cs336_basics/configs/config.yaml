@@ -1,0 +1,19 @@
+defaults:
+  - dataset: tinystory
+  - model: transformer
+  - optimizer: adamw
+  - scheduler: cosine
+  - _self_
+
+training:
+  steps: 10000
+  batch_size: 128
+  seed: 42
+  device: "mps"
+  context_length: 256
+  grad_clip: 0.0
+  eval_interval: 50
+
+logging:
+  project: "CS336-XJ"
+  save_dir: "outputs/" #"outputs/${model.name}/${optimizer.name}/"

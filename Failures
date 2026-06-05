@@ -1,1 +1,21 @@
 1. When computing merges, should deterministically break ties in pair frequency by preferring the lexicographically greater pair. Thus cannot save ID in the SortedList, as token ID cannot represent lexicographical order. For example, ID pair (257, 1) might be (ZZ, A), while ID pair (258, 1) might be (AB, A). Assume the pairs have the same frequency, the second pair would be wrongly seleted as the next to merge due to 258 > 257, while ZZ > AB.
+2. In Pre-tokenization, should try to avoid OOM! Should use finditer instead of findall, and can use mmap to avoid loading all text file content into memory, or stream the reading.
+3. Must be careful on the encode and decode process! Load vocab and merges from file should ensure the same encoding and decoding method.
+4. When decoding, shouldn't convert each id to bytes and then concatenate bytes. Should concatenate the bytes, and then decode!
+5. In pre-tokenization, the following two ways are different, as (front) part of the special tokens might be combined with chars adead (e.g., blank space) which leads to the special tokens broken and not matched correctly.: (1) def pretokenize(text, special_tokens):
+        pre_pat = "|".join(map(re.escape, special_tokens))+'|' if special_tokens else ""
+        PAT = pre_pat + r"'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"
+        print(PAT)
+        return [m.group().encode("utf-8") for m in re.finditer(PAT, text)]
+        (2) pre_pat = "|".join(map(re.escape, special_tokens)) if special_tokens else ""
+        text = re.split(f"({pre_pat})", text)
+        PAT = r"'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"
+        result = [t.encode("utf-8") for i, t_spe in enumerate(text) for t in ([m.group() for m in re.finditer(PAT, t_spe)] if i % 2 == 0 else [t_spe])]
+        return result
+6. nn.Parameter() does not copy the tensor! It directly use the address of the input as return, by wrapping it into the result. nn.init.trunc_normal_ is in_place operation, which changes the underlying storage.
+7. Need to be very very careful on the slice of tensor, they are just reference, not copy. So don't try to change the sliced tensor (if doesn't mean to), otherwise it will also change the original tensor it sliced from.
+8. In gradient_clipping, the norm is computed on "all" params, and scale all params if the norm is too large, instead of per-parameter scale.
+9. Need to note that for Iterable, like generator (e.g., model.parameters()), should make it to a list if want to iterate it more than once.
+10. Don't forget to with torch.no_grad().
+11. Make sure data and model are on the same and correct device.
+12. Must be very careful on whether chaging data in-place.

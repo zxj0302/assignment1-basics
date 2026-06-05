@@ -1,0 +1,3 @@
+name: tinystory
+train_path: "cs336_basics/ts_train_encoded_ids"
+valid_path: "cs336_basics/ts_valid_encoded_ids"

@@ -1,0 +1,5 @@
+name: cosine
+alpha_max: 1e-2
+alpha_min: 1e-4
+T_w: 10
+T_c: 90

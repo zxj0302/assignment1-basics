@@ -7,7 +7,9 @@ from sortedcontainers import SortedList
 import datetime
 import json
 # from memory_profiler import profile
-    
+# import mmap
+from cs336_basics.config import * 
+
 
 # @profile
 def find_chunk_boundaries(
@@ -61,27 +63,73 @@ def find_chunk_boundaries(
 
 
 # @profile
+# # 在模块级别预编译，避免每次调用都重新编译
+# _PAT = re.compile(
+#     r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+# )
+
+# def pretokenization(input_path, start, end, special_tokens):
+#     # 按长度降序排列，避免短 token 匹配掉长 token 的前缀
+#     special_tokens_sorted = sorted(special_tokens, key=len, reverse=True)
+#     pat_special = re.compile("|".join(map(re.escape, special_tokens_sorted)))
+
+#     result = defaultdict(int)
+
+#     # 优化1: mmap + memoryview，避免将整个 chunk 复制到 Python 堆
+#     with open(input_path, "rb") as f:
+#         with mmap.mmap(f.fileno(), length=0, access=mmap.ACCESS_READ) as mm:
+#             view = memoryview(mm)
+#             # bytes(view[start:end]) 只复制所需范围，而非整个文件
+#             chunk = bytes(view[start:end]).decode("utf-8", errors="ignore")
+#             del view  # 立即释放 memoryview 对象
+
+#     # 优化2: finditer + pos/endpos 参数
+#     # 直接在原字符串上划定搜索区间，既不创建片段列表，也不创建子字符串
+#     last = 0
+#     for m in pat_special.finditer(chunk):
+#         if m.start() > last:
+#             for tok in _PAT.finditer(chunk, last, m.start()):
+#                 # 优化3: 直接用 bytes 作 key，而非 tuple
+#                 result[tok.group().encode("utf-8")] += 1
+#         last = m.end()
+
+#     # 处理最后一个 special token 之后的尾部
+#     for tok in _PAT.finditer(chunk, last):
+#         result[tok.group().encode("utf-8")] += 1
+
+#     # 处理完后主动释放，让 GC 可以在函数返回前回收
+#     del chunk
+
+#     return result
 def pretokenization(input_path, start, end, special_tokens):
+    pat_special = "|".join(map(re.escape, special_tokens))
     with open(input_path, 'rb') as f:
         f.seek(start)
         chunk = f.read(end - start).decode("utf-8", errors="ignore")
-    pat_special = "|".join(map(re.escape, special_tokens))
-    chunk = re.split(pat_special, chunk)
+    # chunk = re.split(pat_special, chunk)
     # print(chunk)
     PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
     # Note: should use re.finditer to avoid storing the pre-tokenized words
     # chunk = [re.findall(PAT, c) for c in chunk if len(c) > 0]
     result = defaultdict(int)
-    for c in chunk:
+    def _iter_segments(text, pattern):
+        prev_end = 0
+        for m in re.finditer(pattern, text):
+            yield text[prev_end:m.start()]
+            prev_end = m.end()
+        yield text[prev_end:]
+    for c in _iter_segments(chunk, pat_special):
         if c:
             for match in re.finditer(PAT, c):
                 t = match.group()
-                result[tuple(t.encode("utf-8"))] += 1
+                result[t.encode("utf-8")] += 1
     return result
 
 
 # @profile
-def bpe(input_path, vocab_size, special_tokens, num_processes=1):
+def bpe(input_path, vocab_size, special_tokens, num_processes=-1):
+    if num_processes == -1:
+        num_processes = mp.cpu_count()
     print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3], ": BPE Started")
 
     #============== Vocabulary ==============
@@ -230,44 +278,42 @@ def bpe(input_path, vocab_size, special_tokens, num_processes=1):
 
 
 if __name__ == "__main__":
-    # file_path = "../data/TinyStoriesV2-GPT4-valid.txt"
-    # file_path = "/Users/zxj//Desktop/AI/cs336/assignment1-basics/data/test"
-    # file_path = "/Users/zxj//Desktop/AI/cs336/assignment1-basics/tests/fixtures/corpus.en"
-    # file_path = "../data/TinyStoriesV2-GPT4-train.txt"
-    file_path = "../data/owt_train.txt"
-    vocab, merges = bpe(file_path, 32000, ["<|endoftext|>"], 1)
+    file_path = ts_train_filepath
+    vocab_size = 10000
+    vocab_filepath = vocab_ts_10k_filepath
+    merges_filepath = merges_ts_10k_filepath
+    
+    vocab, merges = bpe(file_path, vocab_size, special_tokens)
 
     # 1. Save the vocabulary (vocab) to a JSON file
-    # We must decode the bytes objects to strings because JSON cannot serialize bytes.
-    # We use errors="backslashreplace" (or "replace") to handle invalid UTF-8 byte sequences safely.
     serializable_vocab = {
-        k: v.decode("utf-8", errors="backslashreplace") for k, v in vocab.items()
+        k: v.decode("latin-1") for k, v in vocab.items()
     }
-    
-    with open("vocab.json", "w", encoding="utf-8") as f:
+    with open(vocab_filepath, "w", encoding="utf-8") as f:
         json.dump(serializable_vocab, f, ensure_ascii=False, indent=2)
 
-    # 2. Save the merge rules to a plain text file (merges.txt)
-    with open("merges.txt", "w", encoding="utf-8") as f:
-        for merge in merges:
-            if isinstance(merge, (tuple, list)) and len(merge) == 2:
-                # Decode the bytes to strings before writing to avoid b'...' formatting
-                p0 = merge[0].decode("utf-8", errors="backslashreplace")
-                p1 = merge[1].decode("utf-8", errors="backslashreplace")
-                f.write(f"{p0} {p1}\n")
-            else:
-                # Fallback if it's already a string/bytes
-                if isinstance(merge, bytes):
-                    merge = merge.decode("utf-8", errors="backslashreplace")
-                f.write(f"{merge}\n")
+    # 2. Save the merge rules to a JSON file (merges.json)
+    serializable_merges = []
+    for merge in merges:
+        if isinstance(merge, (tuple, list)) and len(merge) == 2:
+            p0 = merge[0].decode("latin-1")
+            p1 = merge[1].decode("latin-1")
+            serializable_merges.append([p0, p1])
+        else:
+            if isinstance(merge, bytes):
+                merge = merge.decode("latin-1")
+            serializable_merges.append(merge)
 
-    print("Successfully saved: vocab.json and merges.txt")
+    with open(merges_filepath, "w", encoding="utf-8") as f:
+        json.dump(serializable_merges, f, ensure_ascii=False, indent=2)
+
+    print(f"Successfully saved: {vocab_filepath} and {merges_filepath}")
 
     # Find the longest token by byte length
     longest_token_bytes = max(vocab.values(), key=len)
     
     # Decode it safely to a string so you can print it
-    longest_token_str = longest_token_bytes.decode("utf-8", errors="backslashreplace")
+    longest_token_str = longest_token_bytes.decode("utf-8")
     max_length = len(longest_token_bytes)
 
     print(f"The longest token is: '{longest_token_str}'")
