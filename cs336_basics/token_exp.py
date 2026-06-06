@@ -86,21 +86,21 @@ def encode_file(vocab_filepath, merges_filepath, special_tokens, input_filepath,
 
 if __name__ == "__main__":
     # NOTE: only doing experiments on TinyStories, as OpenWebText is too large.
-    num_doc = 10
+    # num_doc = 10
     
     # (1) compute the compression ratio
     # print("Quantifying on TinyStories Valid Dataset: ")
-    compute_compression_ratio(vocab_ts_10k_filepath, merges_ts_10k_filepath, special_tokens, ts_valid_filepath, num_doc)
+    # compute_compression_ratio(vocab_ts_10k_filepath, merges_ts_10k_filepath, special_tokens, ts_valid_filepath, num_doc)
 
     # print("\nQuantifying on OpenWebText Valid Dataset: ")
     # compute_compression_ratio(vocab_ts_10k_filepath, merges_ts_10k_filepath, special_tokens, owt_valid_filepath, num_doc)
 
     # (2) encode TinyStories and OpenWebText to token IDs
-    encode_file(vocab_ts_10k_filepath, merges_ts_10k_filepath, special_tokens, ts_train_filepath, ts_train_encoded_ids_filepath)
-    tokens = np.fromfile(ts_train_encoded_ids_filepath, dtype=np.uint16)
-    print(tokens.shape, tokens[:10])
+    # encode_file(vocab_ts_10k_filepath, merges_ts_10k_filepath, special_tokens, ts_train_filepath, ts_train_encoded_ids_filepath)
+    # tokens = np.fromfile(ts_train_encoded_ids_filepath, dtype=np.uint16)
+    # print(tokens.shape, tokens[:10])
     # encode_file(vocab_ts_10k_filepath, merges_ts_10k_filepath, special_tokens, ts_valid_filepath, ts_valid_encoded_ids_filepath)
     # tokens = np.fromfile(ts_valid_encoded_ids_filepath, dtype=np.uint16)
     # print(tokens.shape, tokens[:10])
-    # encode_file(vocab_owt_32k_filepath, merges_owt_32k_filepath, special_tokens, owt_train_filepath, owt_train_encoded_ids_filepath)
-    # encode_file(vocab_owt_32k_filepath, merges_owt_32k_filepath, special_tokens, owt_valid_filepath, owt_valid_encoded_ids_filepath)
+    encode_file(vocab_owt_32k_filepath, merges_owt_32k_filepath, special_tokens, owt_train_filepath, owt_train_encoded_ids_filepath)
+    encode_file(vocab_owt_32k_filepath, merges_owt_32k_filepath, special_tokens, owt_valid_filepath, owt_valid_encoded_ids_filepath)

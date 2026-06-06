@@ -7,7 +7,7 @@ import wandb
 import torch
 import numpy as np 
 import os
-# os.environ['WANDB_API_KEY'] = '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'
+os.environ['WANDB_API_KEY'] = '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'
 
 
 def get_model(mcfg: DictConfig):
@@ -26,9 +26,42 @@ def get_optimizer(model, ocfg: DictConfig):
     return optimizer
 
 
+@torch.no_grad()
+def evaluate(model, valid_data, batch_size, context_length, device):
+    model.eval()
+    valid_losses = []
+    
+    # 1. Get starting indices for non-overlapping sequences
+    valid_seq_starts = np.arange(0, len(valid_data) - context_length, context_length)
+    
+    # 2. Iterate through the validation set in batches
+    for i in range(0, len(valid_seq_starts), batch_size):
+        batch_starts = valid_seq_starts[i : i + batch_size]
+        
+        # 3. Construct the batch
+        x_batch = np.stack([valid_data[start : start + context_length] for start in batch_starts])
+        y_batch = np.stack([valid_data[start + 1 : start + context_length + 1] for start in batch_starts])
+        
+        x_tensor = torch.from_numpy(x_batch).long().to(device)
+        y_tensor = torch.from_numpy(y_batch).long().to(device)
+        
+        # 4. Forward pass and accumulate loss
+        logits = model(x_tensor)
+        loss = cross_entropy(logits, y_tensor)
+        valid_losses.append(loss.item())
+        
+    # 5. Average the losses over all validation batches
+    avg_valid_loss = sum(valid_losses) / len(valid_losses) if valid_losses else 0.0
+    
+    # Switch model back to training mode before returning
+    model.train()
+    
+    return avg_valid_loss
+
+
 @hydra.main(config_path="configs", config_name="config", version_base=None)
 def train(cfg: DictConfig):
-    wandb.init(project=cfg.logging.project, name=f"{cfg.model.name}-{cfg.optimizer.name}", config=OmegaConf.to_container(cfg))
+    wandb.init(project=cfg.logging.project, name=f"{cfg.model.name}-{cfg.optimizer.name}-SiLU", config=OmegaConf.to_container(cfg))
 
     train_data = np.memmap(cfg.dataset.train_path, dtype=np.uint16, mode='r')
     valid_data = np.memmap(cfg.dataset.valid_path, dtype=np.uint16, mode='r')
@@ -60,14 +93,15 @@ def train(cfg: DictConfig):
 
         # ============ evaluating ============
         if step % eval_interval == 0 or step == cfg.training.steps - 1:
-            model.eval()
-            with torch.no_grad():
-                # FIX: should use the whole valid dataset instead of a batch
-                valid_sample = data_loading(valid_data, cfg.training.batch_size, context_length=cfg.model.context_length, device=cfg.training.device)
-                logits = model(valid_sample[0])
-                valid_loss = cross_entropy(logits, valid_sample[1])
-            wandb.log({"valid/loss": valid_loss.item()}, step=step)
-            print(f"Step {step}: valid loss = {valid_loss.item()}")
+            valid_loss = evaluate(
+                model=model, 
+                valid_data=valid_data, 
+                batch_size=cfg.training.batch_size, 
+                context_length=cfg.model.context_length, 
+                device=cfg.training.device
+            )
+            wandb.log({"valid/loss": valid_loss}, step=step)
+            print(f"Step {step}: valid loss = {valid_loss}")
             save_checkpoint(model, optimizer, step, os.path.join(save_dir, f"model_step_{step}.pt"))
     wandb.finish()
 

@@ -278,10 +278,14 @@ def bpe(input_path, vocab_size, special_tokens, num_processes=-1):
 
 
 if __name__ == "__main__":
-    file_path = ts_train_filepath
-    vocab_size = 10000
-    vocab_filepath = vocab_ts_10k_filepath
-    merges_filepath = merges_ts_10k_filepath
+    # file_path = ts_train_filepath
+    # vocab_size = 10000
+    # vocab_filepath = vocab_ts_10k_filepath
+    # merges_filepath = merges_ts_10k_filepath
+    file_path = owt_train_filepath
+    vocab_size = 32000
+    vocab_filepath = vocab_owt_32k_filepath
+    merges_filepath = merges_owt_32k_filepath
     
     vocab, merges = bpe(file_path, vocab_size, special_tokens)
 

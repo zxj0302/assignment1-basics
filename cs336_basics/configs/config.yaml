@@ -9,10 +9,10 @@ training:
   steps: 10000
   batch_size: 128
   seed: 42
-  device: "mps"
-  context_length: 256
-  grad_clip: 0.0
-  eval_interval: 50
+  device: "cuda:0"
+  # context_length: 256
+  grad_clip: 1.0
+  eval_interval: 1000
 
 logging:
   project: "CS336-XJ"

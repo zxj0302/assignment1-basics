@@ -40,16 +40,16 @@ def decode(model, prompt, top_p, special_tokens=None, max_token=None, temperatur
 
 if __name__ == "__main__":
     print("Start...")
-    model = Transformer(10000, 16, 512, 16, 1344, 256, 10000)
+    model = Transformer(10000, 4, 512, 16, 1344, 256, 10000)
     optimizer = AdamW(model.parameters(), 0.001, (0.9, 0.999), 1e-4)
     print("Model and Optimizer Initialized")
-    step = load_checkpoint('outputs/chechpoints/model_step_99.pt', model, optimizer)
+    step = load_checkpoint('outputs/chechpoints/model_step_9999.pt', model, optimizer)
     print("Model and Optimizer Loaded")
     tokenizer = Tokenizer.from_files('cs336_basics/vocab_ts_10k.json', 'cs336_basics/merges_ts_10k.json', ['<|endoftext|>'])
-    prompt = "Once upon a time, "
+    prompt = "Once upon a time, there"
     print(f"Prompt is: {prompt}")
     prompt = tokenizer.encode(prompt)
     print(f"Encoded to: {prompt}")
     with torch.no_grad():
-        output = decode(model, prompt, 0.3)
+        output = decode(model, prompt, 0.2)
     print(f"Output: {tokenizer.decode(output)}")

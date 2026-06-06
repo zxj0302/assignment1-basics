@@ -60,6 +60,7 @@ class SwiGLU(nn.Module):
 
     def forward(self, x):
         return self.W2(SiLU(self.W1(x)) * self.W3(x))
+        # return self.W2(SiLU(self.W1(x))) # NoGLU
 
 
 class RoPE(nn.Module):
@@ -80,6 +81,7 @@ class RoPE(nn.Module):
         y1 = result[..., 0] * x0 + result[..., 1] * x1
         result = torch.stack([y0, y1], dim=-1)
         return rearrange(result, "... a b -> ... (a b)")
+        # return x # NoPE
 
 
 def softmax(x, i=None):
@@ -133,6 +135,8 @@ class TransformerBlock(nn.Module):
     def forward(self, x):
         x = x + self.MHA(self.RMSNorm1(x))
         return x + self.SwiGLU(self.RMSNorm2(x))
+        # x = self.RMSNorm1(x + self.MHA(x)) # post-norm
+        # return self.RMSNorm2(x + self.SwiGLU(x))
         
 
 class Transformer(nn.Module):
